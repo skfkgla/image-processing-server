@@ -1,3 +1,20 @@
 spring:
   application:
     name: imageprocessing
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:imageprocessing}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+mock-worker:
+  base-url: https://dev.realteeth.ai/mock
+  api-key: ${MOCK_WORKER_API_KEY}
+
+scheduler:
+  submission-interval-ms: 3000
+  polling-interval-ms: 5000
