@@ -14,6 +14,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -106,10 +109,10 @@ class JobControllerTest {
                 Job.create("key-1", "http://image.com/img1.jpg"),
                 Job.create("key-2", "http://image.com/img2.jpg")
         );
-        when(jobService.listJobs()).thenReturn(jobs);
+        when(jobService.listJobs(any(Pageable.class))).thenReturn(new PageImpl<>(jobs));
 
         mockMvc.perform(get("/api/jobs"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.content.length()").value(2));
     }
 }

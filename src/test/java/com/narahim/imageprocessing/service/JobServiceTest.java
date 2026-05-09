@@ -12,6 +12,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -87,10 +92,11 @@ class JobServiceTest {
                 Job.create("key-1", "http://image.com/img1.jpg"),
                 Job.create("key-2", "http://image.com/img2.jpg")
         );
-        when(jobRepository.findAll()).thenReturn(jobs);
+        Pageable pageable = PageRequest.of(0, 20);
+        when(jobRepository.findAll(pageable)).thenReturn(new PageImpl<>(jobs, pageable, jobs.size()));
 
-        List<Job> result = jobService.listJobs();
+        Page<Job> result = jobService.listJobs(pageable);
 
-        assertThat(result).hasSize(2);
+        assertThat(result.getContent()).hasSize(2);
     }
 }

@@ -2,6 +2,7 @@ package com.narahim.imageprocessing.api;
 
 import com.narahim.imageprocessing.api.dto.CreateJobRequest;
 import com.narahim.imageprocessing.api.dto.JobResponse;
+import com.narahim.imageprocessing.api.dto.PageResponse;
 import com.narahim.imageprocessing.domain.Job;
 import com.narahim.imageprocessing.service.JobService;
 import jakarta.validation.Valid;
@@ -10,7 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import org.springframework.data.domain.Pageable;
+
 import java.util.UUID;
 
 @RestController
@@ -35,10 +37,8 @@ public class JobController {
     }
 
     @GetMapping
-    public ResponseEntity<List<JobResponse>> listJobs() {
-        List<JobResponse> jobs = jobService.listJobs().stream()
-                .map(JobResponse::from)
-                .toList();
+    public ResponseEntity<PageResponse<JobResponse>> listJobs(Pageable pageable) {
+        PageResponse<JobResponse> jobs = PageResponse.of(jobService.listJobs(pageable).map(JobResponse::from));
         return ResponseEntity.ok(jobs);
     }
 }
