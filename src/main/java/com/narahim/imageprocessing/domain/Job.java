@@ -22,7 +22,7 @@ public class Job {
     @Column(name = "idempotency_key", unique = true, nullable = false)
     private String idempotencyKey;
 
-    @Column(name = "image_url", nullable = false)
+    @Column(name = "image_url", nullable = false, length = 2048)
     private String imageUrl;
 
     @Enumerated(EnumType.STRING)
@@ -74,6 +74,11 @@ public class Job {
         this.errorMessage = errorMessage;
         this.status = JobStatus.FAILED;
         this.updatedAt = LocalDateTime.now();
+    }
+
+    public void fail(String errorMessage, String result) {
+        fail(errorMessage);
+        this.result = result;
     }
 
     private void validateNotTerminal() {

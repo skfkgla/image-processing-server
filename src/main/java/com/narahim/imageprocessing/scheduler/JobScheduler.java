@@ -81,7 +81,7 @@ public class JobScheduler {
                     jobRepository.save(job);
                     log.info("Job {} completed", job.getId());
                 } else if (response.isFailed()) {
-                    job.fail("Worker reported failure");
+                    job.fail("Worker reported failure", response.getResult());
                     jobRepository.save(job);
                     log.warn("Job {} failed by worker", job.getId());
                 }

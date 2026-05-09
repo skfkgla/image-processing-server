@@ -52,7 +52,7 @@ public class MockWorkerClient {
                 .uri("/process/{jobId}", workerJobId)
                 .retrieve()
                 .onStatus(
-                        status -> status.is4xxClientError() && !status.equals(HttpStatus.TOO_MANY_REQUESTS),
+                        status -> status.is4xxClientError() && !status.equals(HttpStatus.TOO_MANY_REQUESTS) ,
                         response -> response.bodyToMono(String.class)
                                 .defaultIfEmpty("Client error")
                                 .flatMap(body -> Mono.error(
