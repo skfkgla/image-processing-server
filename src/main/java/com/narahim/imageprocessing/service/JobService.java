@@ -26,7 +26,8 @@ public class JobService {
      *
      * @Transactional을 사용하지 않는 이유:
      * save() 실패로 DataIntegrityViolationException이 발생하면 트랜잭션이 rollback-only로 마킹된다.
-     * 이후 같은 트랜잭션에서 findByIdempotencyKey()를 호출할 수 없으므로,
+     * 이후 findByIdempotencyKey() 조회 자체는 가능하지만, 메서드 종료 시 커밋을 시도하는 순간
+     * UnexpectedRollbackException이 발생한다.
      * 각 repository 호출이 독립적인 트랜잭션으로 동작하도록 outer 트랜잭션을 두지 않는다.
      */
     public Job createJob(String idempotencyKey, String imageUrl) {
