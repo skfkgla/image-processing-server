@@ -248,9 +248,11 @@ RestTemplate은 Spring 6부터 deprecated되어 신규 프로젝트에 적합하
 | 클라이언트 → 내 서버 | Exactly-once에 가까움 | Idempotency-Key로 중복 방어 |
 | 내 서버 → Mock Worker | At-least-once | 제출 후 DB 업데이트 전 장애 시 재제출 가능 |
 
-Exactly-once를 보장하려면 Mock Worker 제출과 DB 업데이트가 하나의 트랜잭션으로 묶여야 합니다. 
-그러나 Mock Worker는 외부 HTTP API이므로 DB 트랜잭션에 포함할 수 없습니다. 
-외부 시스템이 개입하는 구간에서 Exactly-once는 현실적으로 달성 불가능하며, At-least-once를 기본으로 삼고 멱등성으로 중복을 방어하는 방식을 채택했습니다.
+**At-least-once가 보장되는 이유**: Mock Worker 제출 전에 이미 DB에 `PENDING`으로 저장되어 있고, 스케줄러가 `PENDING` Job을 지속적으로 재시도합니다. 제출 도중 서버가 재시작되더라도 DB에 남아있는 `PENDING` 상태를 기반으로 재제출이 발생하므로, 처리가 한 번도 이루어지지 않는 경우는 없습니다.
+
+**Exactly-once가 불가능한 이유**: HTTP 호출은 DB 트랜잭션에 참여하지 않으므로, Mock Worker 호출이 성공한 뒤 DB 업데이트가 실패해도 HTTP 요청은 롤백되지 않습니다. 또한 Mock Worker 자체가 중복 제출에 대한 exactly-once를 보장하지 않아, 같은 작업이 두 번 제출되면 두 번 처리될 수 있습니다. 
+
+**결론**: At-least-once를 기본으로 삼고 멱등성으로 중복을 방어하는 방식을 채택했습니다.
 
 ---
 
