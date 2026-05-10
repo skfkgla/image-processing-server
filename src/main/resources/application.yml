@@ -1,7 +1,3 @@
 spring:
   application:
     name: imageprocessing
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: false

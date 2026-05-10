@@ -5,6 +5,11 @@ spring:
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
 
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
 mock-worker:
   base-url: https://dev.realteeth.ai/mock
   api-key: ${MOCK_WORKER_API_KEY:mock_8c5200fc56f1433980a0d903a51a12fe}
