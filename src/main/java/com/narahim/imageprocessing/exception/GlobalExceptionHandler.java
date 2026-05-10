@@ -1,5 +1,6 @@
 package com.narahim.imageprocessing.exception;
 
+import com.narahim.imageprocessing.api.dto.ErrorResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -7,42 +8,40 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.util.Map;
-
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(JobNotFoundException.class)
-    public ResponseEntity<Map<String, String>> handleJobNotFound(JobNotFoundException e) {
+    public ResponseEntity<ErrorResponse> handleJobNotFound(JobNotFoundException e) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("error", e.getMessage()));
+                .body(new ErrorResponse(e.getMessage()));
     }
 
     @ExceptionHandler(RetryableConflictException.class)
-    public ResponseEntity<Map<String, String>> handleRetryableConflict(RetryableConflictException e) {
+    public ResponseEntity<ErrorResponse> handleRetryableConflict(RetryableConflictException e) {
         return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(Map.of("message", e.getMessage()));
+                .body(new ErrorResponse(e.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, String>> handleValidation(MethodArgumentNotValidException e) {
+    public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException e) {
         String message = e.getBindingResult().getFieldErrors().stream()
                 .map(err -> err.getField() + ": " + err.getDefaultMessage())
                 .findFirst()
                 .orElse("Validation failed");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("error", message));
+                .body(new ErrorResponse(message));
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
-    public ResponseEntity<Map<String, String>> handleMissingHeader(MissingRequestHeaderException e) {
+    public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("error", "Required header missing: " + e.getHeaderName()));
+                .body(new ErrorResponse("Required header missing: " + e.getHeaderName()));
     }
 
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<Map<String, String>> handleGeneral(Exception e) {
+    public ResponseEntity<ErrorResponse> handleGeneral(Exception e) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Internal server error"));
+                .body(new ErrorResponse("Internal server error"));
     }
 }
