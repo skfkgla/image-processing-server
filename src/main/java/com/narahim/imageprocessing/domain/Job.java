@@ -59,21 +59,27 @@ public class Job {
     }
 
     public void startProcessing(String workerJobId) {
-        validateNotTerminal();
+        if (this.status != JobStatus.PENDING) {
+            throw new IllegalStateException("Can only transition to PROCESSING from PENDING, current: " + this.status);
+        }
         this.workerJobId = workerJobId;
         this.status = JobStatus.PROCESSING;
         this.updatedAt = LocalDateTime.now();
     }
 
     public void complete(String result) {
-        validateNotTerminal();
+        if (this.status != JobStatus.PROCESSING) {
+            throw new IllegalStateException("Can only transition to COMPLETED from PROCESSING, current: " + this.status);
+        }
         this.result = result;
         this.status = JobStatus.COMPLETED;
         this.updatedAt = LocalDateTime.now();
     }
 
     public void fail(String errorMessage) {
-        validateNotTerminal();
+        if (this.status != JobStatus.PENDING && this.status != JobStatus.PROCESSING) {
+            throw new IllegalStateException("Can only transition to FAILED from PENDING or PROCESSING, current: " + this.status);
+        }
         this.errorMessage = errorMessage;
         this.status = JobStatus.FAILED;
         this.updatedAt = LocalDateTime.now();
@@ -82,11 +88,5 @@ public class Job {
     public void fail(String errorMessage, String result) {
         fail(errorMessage);
         this.result = result;
-    }
-
-    private void validateNotTerminal() {
-        if (this.status == JobStatus.COMPLETED || this.status == JobStatus.FAILED) {
-            throw new IllegalStateException("Cannot transition from terminal state: " + this.status);
-        }
     }
 }
