@@ -5,29 +5,67 @@
 
 ---
 
-## 목차
+## 기술 스택
 
-- [시스템 구조](#시스템-구조)
-- [실행 방법](#실행-방법)
-- [API 명세](#api-명세)
-- [설계 설명](#설계-설명)
-- [기술 스택](#기술-스택)
+- Java 17 / Spring Boot 3.5
+- Spring Data JPA / PostgreSQL
+- Spring WebFlux (WebClient)
+- Docker / Docker Compose
+- JUnit 5 / Mockito / MockWebServer
 
 ---
 
 ## 실행 방법
 
-### 사전 준비 — Mock Worker API Key 발급
 
-아래 요청으로 API Key를 발급받습니다.
+### Docker로 실행
 
 ```bash
-curl -X POST https://dev.realteeth.ai/mock/auth/issue-key \
-  -H "Content-Type: application/json" \
-  -d '{"candidateName": "홍길동", "email": "example@email.com"}'
+# 1. JAR 빌드
+./gradlew bootJar -x test
+
+# 2. 컨테이너 실행
+docker compose up -d
 ```
 
-응답으로 받은 `apiKey` 값을 `MOCK_WORKER_API_KEY` 환경변수로 사용합니다.
+서버: `http://localhost:8080`
+PostgreSQL: `localhost:5432`
+
+---
+
+### 로컬에서 직접 실행
+
+위 docker compose로 DB를 먼저 띄운 후 실행합니다.
+
+```bash
+# DB만 실행
+docker compose up db -d
+
+# 앱 실행
+./gradlew bootRun --args='--spring.profiles.active=local'
+```
+
+---
+
+## API 명세
+
+
+Swagger UI: http://localhost:8080/swagger-ui/index.html
+
+### POST /api/jobs — 이미지 처리 요청
+
+```
+Headers:
+  Idempotency-Key: {UUID}   # 중복 요청 방지용
+
+Body:
+  { "imageUrl": "https://..." }
+```
+
+### GET /api/jobs/{jobId} — 작업 조회
+
+
+### GET /api/jobs — 전체 작업 목록
 
 ---
 
@@ -41,7 +79,7 @@ Client → [내 서버] → Mock Worker (외부 AI 서비스)
 
 Mock Worker는 GPU 기반의 무거운 AI 추론 작업을 수행하며, 응답 시간이 수 초에서 수십 초까지 변동됩니다. 이를 동기적으로 처리하면 클라이언트는 응답을 받기까지 오랜 시간 대기해야 합니다.
 
-이 문제를 해결하기 위해 **비동기 작업 큐 패턴**을 채택했습니다.
+이 문제를 해결하기 위해 **DB 폴링 기반 비동기 처리 패턴**을 채택했습니다.
 
 1. 클라이언트가 요청을 보내면 서버는 즉시 `jobId`를 반환합니다
 2. 백그라운드에서 서버가 Mock Worker에 작업을 제출하고 완료를 기다립니다
@@ -53,11 +91,11 @@ Mock Worker는 GPU 기반의 무거운 AI 추론 작업을 수행하며, 응답 
 
 **JobService** — Job 생성 및 조회 비즈니스 로직을 담당합니다. Idempotency-Key 기반 중복 처리를 포함합니다.
 
-**JobRepository (DB)** — Job 상태를 영속화합니다. `idempotency_key`에 unique index, `status`에 index를 적용합니다.
+**JobRepository (DB)** — Job 상태를 영속화합니다. `idempotency_key`에 unique 설정, `status`에 index를 적용합니다.
 
 **JobScheduler** — 두 개의 스케줄러가 주기적으로 DB를 확인하여 상태를 전이합니다.
-- submission: `PENDING` Job을 감지하여 Mock Worker에 제출하고 `PROCESSING`으로 전환합니다
-- polling: `PROCESSING` Job을 감지하여 Mock Worker에 상태를 조회하고 `COMPLETED` 또는 `FAILED`로 전환합니다
+- 제출: `PENDING` Job을 감지하여 Mock Worker에 제출하고 `PROCESSING`으로 전환합니다
+- 상태 확인: `PROCESSING` Job을 감지하여 Mock Worker에 상태를 조회하고 `COMPLETED` 또는 `FAILED`로 전환합니다
 
 **MockWorkerClient** — WebClient 기반 HTTP 클라이언트입니다. 일시적 오류(429/5xx)에 대해 Exponential Backoff로 최대 3회 재시도합니다.
 
@@ -69,90 +107,7 @@ Mock Worker는 GPU 기반의 무거운 AI 추론 작업을 수행하며, 응답 
 
 **폴링 방식**: Mock Worker가 Webhook을 지원하지 않으므로 완료 감지는 서버 내부 폴링으로 처리합니다. 동시에 여러 Job을 비동기로 폴링하면 Mock Worker에 429를 유발할 수 있어, 순차적으로 처리합니다.
 
----
 
-### Docker로 실행 (권장)
-
-```bash
-# 1. JAR 빌드
-./gradlew bootJar
-
-# 2. 컨테이너 실행
-MOCK_WORKER_API_KEY=your_api_key docker compose up
-```
-
-서버: `http://localhost:8080`
-PostgreSQL: `localhost:5432`
-
----
-
-### 로컬에서 직접 실행
-
-PostgreSQL이 로컬에 실행 중이어야 합니다.
-
-```bash
-# DB 생성
-createdb imageprocessing
-
-# 실행
-MOCK_WORKER_API_KEY=your_api_key \
-DB_HOST=localhost \
-DB_NAME=imageprocessing \
-DB_USERNAME=postgres \
-DB_PASSWORD=postgres \
-./gradlew bootRun
-```
-
----
-
-## API 명세
-
-### POST /api/jobs — 이미지 처리 요청
-
-```
-Headers:
-  Idempotency-Key: {UUID v4}   # 중복 요청 방지용
-
-Body:
-  { "imageUrl": "https://..." }
-
-Response 201:
-  {
-    "id": "uuid",
-    "status": "PENDING",
-    "imageUrl": "https://...",
-    "result": null,
-    "errorMessage": null,
-    "createdAt": "...",
-    "updatedAt": "..."
-  }
-
-Response 202: 동일 키로 동시 요청 충돌 시 — 잠시 후 재시도 필요
-Response 400: 요청 검증 실패
-```
-
-### GET /api/jobs/{jobId} — 작업 조회
-
-```
-Response 200:
-  {
-    "id": "uuid",
-    "status": "PENDING | PROCESSING | COMPLETED | FAILED",
-    "imageUrl": "https://...",
-    "result": "처리 결과 (COMPLETED 시)",
-    "errorMessage": "에러 메시지 (FAILED 시)",
-    "createdAt": "...",
-    "updatedAt": "..."
-  }
-
-Response 404: 존재하지 않는 jobId
-```
-
-### GET /api/jobs — 전체 작업 목록
-
-```
-Response 200: Job 배열
-```
 
 ---
 
@@ -162,15 +117,18 @@ Response 200: Job 배열
 
 ```
 PENDING → PROCESSING → COMPLETED
-                     → FAILED
+          ↘        ↙
+            FAILED
 ```
 
-| 상태 | 의미 |
-|------|------|
-| `PENDING` | 클라이언트 요청 수신 완료, Mock Worker 미제출 |
-| `PROCESSING` | Mock Worker에 제출 완료, 결과 대기 중 |
-| `COMPLETED` | 처리 완료, 결과 존재 |
-| `FAILED` | 처리 실패, 에러 메시지 존재 |
+| 상태 | 의미 | 전이 가능 상태 |
+|------|------|--------------|
+| `PENDING` | 클라이언트 요청 수신 완료, Mock Worker 미제출 | `PROCESSING`, `FAILED` |
+| `PROCESSING` | Mock Worker에 제출 완료, 결과 대기 중 | `COMPLETED`, `FAILED` |
+| `COMPLETED` | 처리 완료, 결과 존재 | (종료) |
+| `FAILED` | 처리 실패, 에러 메시지 존재 | (종료) |
+
+허용되지 않는 전이(`PROCESSING → PENDING` 등)는 도메인 레이어에서 예외를 발생시켜 차단합니다.
 
 **PENDING을 분리한 이유**: 클라이언트 요청이 서버에 도달한 사실을 외부 시스템 호출 성공 여부와 무관하게 즉시 DB에 기록합니다. "요청의 접수"와 "처리의 위임"을 분리함으로써, Mock Worker 장애가 발생해도 요청이 유실되지 않고 재시도 가능한 상태로 남습니다.
 
@@ -207,7 +165,7 @@ PENDING → PROCESSING → COMPLETED
 - 같은 Key로 재요청 → 기존 Job 그대로 반환 (멱등성 보장)
 - 새로운 Key로 요청 → 같은 imageUrl이라도 새 Job 생성 (의도적 재처리 허용)
 
-**동시성 처리**: `idempotency_key` 컬럼에 unique index를 적용합니다. 동시에 같은 Key로 요청이 들어올 경우 하나는 insert에 성공하고 하나는 DB unique constraint 위반 예외를 받습니다. 이 예외를 잡아 기존 Job을 조회하여 반환합니다. 중복 방어를 어플리케이션 레벨의 select 후 insert가 아닌 DB constraint에 의존함으로써 동시성 문제를 DB가 보장하도록 합니다.
+**동시성 처리**: `idempotency_key` 컬럼에 unique 설정을 적용합니다. 동시에 같은 Key로 요청이 들어올 경우 하나는 insert에 성공하고 하나는 DB unique constraint 위반 예외를 받습니다. 이 예외를 잡아 기존 Job을 조회하여 반환합니다. 중복 방어를 어플리케이션 레벨의 select 후 insert가 아닌 DB constraint에 의존함으로써 동시성 문제를 DB가 보장하도록 합니다.
 
 **극단적 동시성 케이스**: constraint 위반 후 SELECT를 시도했을 때 아직 commit되지 않아 row가 없는 경우 HTTP 202를 반환하여 클라이언트가 잠시 후 재요청하도록 유도합니다. 발생 확률이 매우 낮으나 명시적으로 처리합니다.
 
@@ -219,25 +177,22 @@ PENDING → PROCESSING → COMPLETED
 
 **GET /api/jobs/{jobId}**: PK 기반 조회라 DB 부하는 낮습니다. 다만 클라이언트가 작업 완료를 확인하기 위해 짧은 주기로 반복 호출하면 Job 수에 비례해 요청이 급증할 수 있습니다.
 
-**GET /api/jobs**: Job이 쌓일수록 전체 목록 조회 쿼리가 느려집니다. 페이지네이션이 필요합니다.
+**GET /api/jobs**: Job이 쌓일수록 전체 목록 조회 쿼리가 느려집니다. 페이지네이션으로 이를 해결했습니다.
 
-**내부 폴러 (Scheduler)**: `PROCESSING` 상태 Job 전체를 주기적으로 조회하므로 `status` 컬럼에 인덱스가 필요합니다 (적용됨). 순차 폴링 방식을 채택했으나 `PROCESSING` Job이 대량으로 쌓이면 1회 폴링 사이클이 길어집니다. `PENDING` Job이 대량으로 쌓인 경우 한 번에 Mock Worker에 제출을 시도하면 429를 유발할 수 있습니다.
+**내부 폴러 (Scheduler)**: `PROCESSING` 상태 Job 전체를 주기적으로 조회하므로 `status` 컬럼에 인덱스가 필요합니다(수정). 순차 폴링 방식을 채택했으나 `PROCESSING` Job이 대량으로 쌓이면 1회 폴링 사이클이 길어집니다. `PENDING` Job이 대량으로 쌓인 경우 한 번에 Mock Worker에 제출을 시도하면 429를 유발할 수 있습니다.
 
 ---
 
 ### 외부 시스템과의 연동 방식 및 선택 이유
 
-**연동 방식: HTTP**
-Mock Worker가 HTTP API로만 제공됩니다. 다른 프로토콜은 선택지가 아닙니다.
+| 항목 | 채택 | 이유                                                                                     |
+|------|------|----------------------------------------------------------------------------------------|
+| 연동 방식 | HTTP | Mock Worker가 HTTP API로만 제공                                                             |
+| 완료 감지 | 폴링 | Mock Worker가 Webhook을 지원하지 않아 폴링 방식 선택                                                 |
+| 폴링 방식 | 동기(순차) | 비동기 동시 폴링 시 Mock Worker에 429 유발 가능성 높아 순차적 요청으로 폴링                                     |
+| HTTP 클라이언트 | WebClient | RestTemplate은 Spring 6부터 deprecated. Feign Client는 동기 방식이라 추후 순차 → 병렬 폴링 전환 시 대응 불가. WebClient는 비동기를 지원하므로 병렬 전환이 가능하며 `.retryWhen()`으로 재시도 로직을 선언적으로 표현 가능 |
 
-**완료 감지 방식: 폴링**
-Mock Worker가 Webhook(콜백)을 지원하지 않으므로 서버가 주기적으로 상태를 확인하는 폴링이 유일한 선택지입니다.
-
-**폴링 방식: 동기(순차)**
-비동기로 여러 Job을 동시에 폴링하면 Mock Worker에 429를 유발할 가능성이 높습니다. 순차 처리로 부하를 제어합니다. 폴링 주기는 Mock Worker의 응답 특성(수 초 ~ 수십 초)을 고려하여 5초로 설정했습니다.
-
-**HTTP 클라이언트: WebClient**
-RestTemplate은 Spring 6부터 deprecated되어 신규 프로젝트에 적합하지 않습니다. WebClient는 이미 추가된 `spring-boot-starter-webflux` 의존성을 활용하며, `.retryWhen()`으로 Exponential Backoff 재시도 로직을 선언적으로 표현할 수 있어 선택했습니다.
+**폴링 주기를 5초로 설정한 이유**: Mock Worker의 최소 처리 시간이 수 초 수준이므로 그보다 짧은 주기는 완료 전 반복 조회만 유발합니다. 반면 너무 길면 완료 후 반환이 지연됩니다. 수 초 ~ 수십 초의 처리 특성을 고려해 5초를 균형점으로 설정했습니다.
 
 ---
 
@@ -258,19 +213,17 @@ RestTemplate은 Spring 6부터 deprecated되어 신규 프로젝트에 적합하
 
 ### 서버 재시작 시 동작
 
-| 시점 | 결과 |
+서버에는 별도의 시작 복구 로직이 없습니다. 스케줄러가 재시작 후 첫 사이클부터 DB에 남아있는 상태를 기반으로 동작하며, 대부분의 경우 자연 복구됩니다.
+
+| 시점 | 재시작 후 동작 |
 |------|------|
 | 요청 수신 ~ DB 저장 | 요청 완전 유실. 클라이언트가 동일 Idempotency-Key로 재시도하여 복구 |
-| Mock Worker 제출 ~ DB 업데이트 | DB는 PENDING이지만 Worker에는 작업이 올라간 상태. 재시작 후 재제출 발생 (At-least-once 트레이드오프) |
+| Mock Worker 제출 ~ DB 업데이트 | DB는 PENDING, Worker에는 이미 제출된 상태. 재시작 후 스케줄러가 PENDING을 감지하여 재제출 |
 | PROCESSING 상태에서 재시작 | 재시작 후 폴러가 PROCESSING Job을 감지하여 폴링 재개. 자연 복구 |
-| 폴링으로 COMPLETED 확인 ~ DB 업데이트 | DB는 PROCESSING, 실제론 완료. 다음 폴링 사이클에서 재확인 후 업데이트. 자연 복구 |
+| 폴링으로 완료 확인 ~ DB 업데이트 | DB는 PROCESSING, 실제론 완료. 다음 폴링 사이클에서 재확인 후 업데이트. 자연 복구 |
 
----
+**데이터 정합성이 깨질 수 있는 지점**
 
-## 기술 스택
+서버 재시작 구간에서는 대부분 자연 복구되며, 데이터 정합성이 깨질 수 있는 지점은 **종료 상태(COMPLETED/FAILED) 기록 이후**입니다.
 
-- Java 17 / Spring Boot 3.5
-- Spring Data JPA / PostgreSQL
-- Spring WebFlux (WebClient)
-- Docker / Docker Compose
-- JUnit 5 / Mockito / MockWebServer
+`COMPLETED`와 `FAILED`를 단방향 종료 상태로 도메인에서 정의했기 때문에 해당 상태 기록 이후 폴링을 중단합니다. 따라서 이후 Worker가 해당 잡의 상태를 변경하거나 만료/삭제하더라도 감지하지 않으며, DB의 종료 상태가 최종 값으로 유지됩니다.
