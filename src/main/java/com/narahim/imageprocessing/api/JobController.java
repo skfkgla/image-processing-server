@@ -37,8 +37,8 @@ public class JobController {
     }
 
     @GetMapping
-    public ResponseEntity<PageResponse<JobResponse>> listJobs(Pageable pageable) {
-        PageResponse<JobResponse> jobs = PageResponse.of(jobService.listJobs(pageable).map(JobResponse::from));
+    public ResponseEntity<PageResponse<JobResponse>> getJobs(Pageable pageable) {
+        PageResponse<JobResponse> jobs = PageResponse.of(jobService.getJobs(pageable).map(JobResponse::from));
         return ResponseEntity.ok(jobs);
     }
 }

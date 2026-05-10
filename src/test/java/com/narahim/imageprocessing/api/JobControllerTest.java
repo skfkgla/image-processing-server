@@ -110,7 +110,7 @@ class JobControllerTest {
                 Job.create("key-1", "http://image.com/img1.jpg"),
                 Job.create("key-2", "http://image.com/img2.jpg")
         );
-        when(jobService.listJobs(any(Pageable.class))).thenReturn(new PageImpl<>(jobs));
+        when(jobService.getJobs(any(Pageable.class))).thenReturn(new PageImpl<>(jobs));
 
         mockMvc.perform(get("/api/jobs"))
                 .andExpect(status().isOk())

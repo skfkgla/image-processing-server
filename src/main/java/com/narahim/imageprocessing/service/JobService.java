@@ -48,7 +48,7 @@ public class JobService {
     }
 
     @Transactional(readOnly = true)
-    public Page<Job> listJobs(Pageable pageable) {
+    public Page<Job> getJobs(Pageable pageable) {
         return jobRepository.findAll(pageable);
     }
 }

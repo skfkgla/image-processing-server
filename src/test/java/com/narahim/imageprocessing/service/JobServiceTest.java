@@ -87,7 +87,7 @@ class JobServiceTest {
     }
 
     @Test
-    void listJobs_returnsAll() {
+    void getJobs_returnsAll() {
         List<Job> jobs = List.of(
                 Job.create("key-1", "http://image.com/img1.jpg"),
                 Job.create("key-2", "http://image.com/img2.jpg")
@@ -95,7 +95,7 @@ class JobServiceTest {
         Pageable pageable = PageRequest.of(0, 20);
         when(jobRepository.findAll(pageable)).thenReturn(new PageImpl<>(jobs, pageable, jobs.size()));
 
-        Page<Job> result = jobService.listJobs(pageable);
+        Page<Job> result = jobService.getJobs(pageable);
 
         assertThat(result.getContent()).hasSize(2);
     }
