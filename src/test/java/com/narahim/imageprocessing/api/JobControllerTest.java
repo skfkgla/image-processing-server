@@ -18,6 +18,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -49,7 +50,7 @@ class JobControllerTest {
         mockMvc.perform(post("/api/jobs")
                         .header("Idempotency-Key", "idem-key-1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"imageUrl\":\"http://image.com/img.jpg\"}"))
+                        .content(objectMapper.writeValueAsString(Map.of("imageUrl", "http://image.com/img.jpg"))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("PENDING"))
                 .andExpect(jsonPath("$.imageUrl").value("http://image.com/img.jpg"));
@@ -59,7 +60,7 @@ class JobControllerTest {
     void createJob_missingIdempotencyKey_returns400() throws Exception {
         mockMvc.perform(post("/api/jobs")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"imageUrl\":\"http://image.com/img.jpg\"}"))
+                        .content(objectMapper.writeValueAsString(Map.of("imageUrl", "http://image.com/img.jpg"))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -68,7 +69,7 @@ class JobControllerTest {
         mockMvc.perform(post("/api/jobs")
                         .header("Idempotency-Key", "idem-key-1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"imageUrl\":\"\"}"))
+                        .content(objectMapper.writeValueAsString(Map.of("imageUrl", ""))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -79,7 +80,7 @@ class JobControllerTest {
         mockMvc.perform(post("/api/jobs")
                         .header("Idempotency-Key", "idem-key-1")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"imageUrl\":\"http://image.com/img.jpg\"}"))
+                        .content(objectMapper.writeValueAsString(Map.of("imageUrl", "http://image.com/img.jpg"))))
                 .andExpect(status().isAccepted());
     }
 

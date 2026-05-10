@@ -1,5 +1,7 @@
 package com.narahim.imageprocessing.worker;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.narahim.imageprocessing.exception.PermanentWorkerException;
 import com.narahim.imageprocessing.worker.dto.WorkerProcessStartResponse;
 import com.narahim.imageprocessing.worker.dto.WorkerProcessStatusResponse;
@@ -11,12 +13,15 @@ import org.junit.jupiter.api.Test;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class MockWorkerClientTest {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private MockWebServer mockWebServer;
     private MockWorkerClient client;
 
@@ -36,9 +41,13 @@ class MockWorkerClientTest {
     }
 
     @Test
-    void submit_success() {
+    void submit_success() throws JsonProcessingException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("jobId", "worker-job-1");
+        body.put("status", "PROCESSING");
+
         mockWebServer.enqueue(new MockResponse()
-                .setBody("{\"jobId\":\"worker-job-1\",\"status\":\"PROCESSING\"}")
+                .setBody(objectMapper.writeValueAsString(body))
                 .addHeader("Content-Type", "application/json"));
 
         WorkerProcessStartResponse response = client.submit("http://image.com/img.jpg");
@@ -48,17 +57,28 @@ class MockWorkerClientTest {
     }
 
     @Test
-    void submit_4xx_throwsPermanentWorkerException() {
-        mockWebServer.enqueue(new MockResponse().setResponseCode(400).setBody("{\"detail\":\"bad request\"}").addHeader("Content-Type", "application/json"));
+    void submit_4xx_throwsPermanentWorkerException() throws JsonProcessingException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("detail", "bad request");
+
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(400)
+                .setBody(objectMapper.writeValueAsString(body))
+                .addHeader("Content-Type", "application/json"));
 
         assertThatThrownBy(() -> client.submit("http://image.com/img.jpg"))
                 .isInstanceOf(PermanentWorkerException.class);
     }
 
     @Test
-    void getStatus_completed() {
+    void getStatus_completed() throws JsonProcessingException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("jobId", "worker-job-1");
+        body.put("status", "COMPLETED");
+        body.put("result", "ok");
+
         mockWebServer.enqueue(new MockResponse()
-                .setBody("{\"jobId\":\"worker-job-1\",\"status\":\"COMPLETED\",\"result\":\"ok\"}")
+                .setBody(objectMapper.writeValueAsString(body))
                 .addHeader("Content-Type", "application/json"));
 
         WorkerProcessStatusResponse response = client.getStatus("worker-job-1");
@@ -68,13 +88,33 @@ class MockWorkerClientTest {
     }
 
     @Test
-    void getStatus_failed() {
+    void getStatus_workerReportedFailed() throws JsonProcessingException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("jobId", "worker-job-1");
+        body.put("status", "FAILED");
+        body.put("result", "processing error occurred");
+
         mockWebServer.enqueue(new MockResponse()
-                .setBody("{\"jobId\":\"worker-job-1\",\"status\":\"FAILED\",\"result\":null}")
+                .setBody(objectMapper.writeValueAsString(body))
                 .addHeader("Content-Type", "application/json"));
 
         WorkerProcessStatusResponse response = client.getStatus("worker-job-1");
 
         assertThat(response.isFailed()).isTrue();
+        assertThat(response.getResult()).isEqualTo("processing error occurred");
+    }
+
+    @Test
+    void getStatus_4xx_throwsPermanentWorkerException() throws JsonProcessingException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("detail", "not found");
+
+        mockWebServer.enqueue(new MockResponse()
+                .setResponseCode(404)
+                .setBody(objectMapper.writeValueAsString(body))
+                .addHeader("Content-Type", "application/json"));
+
+        assertThatThrownBy(() -> client.getStatus("worker-job-1"))
+                .isInstanceOf(PermanentWorkerException.class);
     }
 }
