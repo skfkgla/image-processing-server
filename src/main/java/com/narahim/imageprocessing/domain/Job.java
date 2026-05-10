@@ -7,6 +7,8 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+import org.hibernate.annotations.UuidGenerator;
+
 @Entity
 @Table(
     name = "jobs",
@@ -17,6 +19,8 @@ import java.util.UUID;
 public class Job {
 
     @Id
+	@UuidGenerator(style = UuidGenerator.Style.TIME)
+	@Column(name = "id", columnDefinition = "uuid")
     private UUID id;
 
     @Column(name = "idempotency_key", unique = true, nullable = false)
@@ -46,7 +50,6 @@ public class Job {
 
     public static Job create(String idempotencyKey, String imageUrl) {
         Job job = new Job();
-        job.id = UUID.randomUUID();
         job.idempotencyKey = idempotencyKey;
         job.imageUrl = imageUrl;
         job.status = JobStatus.PENDING;
