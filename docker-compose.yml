@@ -24,7 +24,7 @@ services:
       DB_NAME: imageprocessing
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
-      MOCK_WORKER_API_KEY: ${MOCK_WORKER_API_KEY}
+      MOCK_WORKER_API_KEY: mock_8c5200fc56f1433980a0d903a51a12fe
     depends_on:
       db:
         condition: service_healthy
