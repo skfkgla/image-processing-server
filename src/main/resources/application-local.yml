@@ -15,5 +15,5 @@ mock-worker:
   api-key: ${MOCK_WORKER_API_KEY:mock_8c5200fc56f1433980a0d903a51a12fe}
 
 scheduler:
-  submission-interval-ms: 3000
+  submission-interval-ms: 5000
   polling-interval-ms: 5000
